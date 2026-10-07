@@ -1,0 +1,1120 @@
+---
+title: "Data Analysis for Spool et al 2026 Knitted"
+author: "Ruth Berganross"
+date: ' Spring 2026'
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+    toc_float: yes
+    theme: cerulean
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup and Data Import
+#Loading appropriate packages
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(EnvStats)
+library(tidyr)
+library(stats)
+library(jtools)
+library(effsize)
+library(tinytex)
+library(ICC)
+
+```
+
+#Organizing Dataframes for Experiment 1
+```{r}
+#Behavioral Experiment 1 Data Frame
+dfexp1<- read.csv("C:/Users/Wallace/Desktop/Jeremy and Ruth Research/RepAggNeuroFinalCode/Spool et al 2026 datasheet experiment 1.csv")
+
+#Behavioral Experiment 1 Data Frame Filter Mirror treatment only
+dfexp1mirror<-dfexp1 %>% 
+  filter(treatment == "mirror")
+
+#Behavioral Experiment 1 Data Frame Filter Control treatment only
+dfexp1control<-dfexp1 %>% 
+  filter(treatment == "none")
+
+#Behavioral Experiment 1 Pulling Monday Average Gill Flaring
+mondaygillflareexp1mirror<-dfexp1mirror%>% 
+  select(monday_average_startflare_prop)
+mondaygillflareexp1mirror$experiment<-"behavioral_experiment_1"
+colnames(mondaygillflareexp1mirror) <- c("GF","experiment")
+
+#Behavioral Experiment 1 Pulling Gill Flaring For All 3 Mondays aka days 1, 8, and 15 (Mirror and Control treatments included)
+dfexp1day1<-dfexp1 %>% 
+  gather(key = "day", value = "startflare_prop", monday1_startflare_prop,monday2_startflare_prop,monday3_startflare_prop)
+dfexp1day1<-dfexp1day1 %>% 
+  select(day, social_treatment, startflare_prop)
+
+#Behavioral Experiment 1 Pulling Gill Flaring For All 3 Thursdays aka days 4, 11, and 18 (Mirror and Control treatments included)
+dfexp1day18<-dfexp1 %>% 
+  gather(key = "day", value = "startflare_prop", thursday1_startflare_prop,thursday2_startflare_prop,thursday3_startflare_prop)
+dfexp1day18<-dfexp1day18 %>% 
+  select(day, social_treatment, startflare_prop)
+
+#Behavioral Experiment 1 Comparing Day 1 and Day 18
+dffirstlast<-rbind(dfexp1day1, dfexp1day18)
+dffirstlast<-dffirstlast %>% filter(day == "monday1_startflare_prop"|day == "thursday3_startflare_prop")
+
+#Behavioral Experiment 1 Comparing Day 1 and Day 18 Control ONLY
+dffirstlastcontrol<-dffirstlast %>%
+  filter(social_treatment == "none")
+
+#Behavioral Experiment 1 Comparing Day 1 and Day 18 Mirror ONLY
+dffirstlastmirror<-dffirstlast %>%
+  filter(social_treatment == "mirror")
+
+
+```
+
+#Organizing Dataframes for Experiment 2
+```{r}
+
+#Behavioral Experiment 2 Data Frame
+dfexp2<-read.csv("C:/Users/Wallace/Desktop/Jeremy and Ruth Research/RepAggNeuroFinalCode/Spool et al 2026 datasheet experiment 2.csv", na.string = c("", "NA"))
+
+#Organization so plotting has correct order for treatment groups and weeks
+dfexp2$treatment = factor(dfexp2$treatment, levels = c("control", "mirror"))
+dfexp2$week = factor(dfexp2$week, levels = c("one", "two", "three"))
+
+#Behavioral Experiment 2 Data Frame Filtered Just Mirror treatment
+dfexp2mirror<-dfexp2 %>% 
+  filter(treatment == "mirror")
+
+#New Data Frame For Experiment 2 Mirror Group ONLY specification so the figure orders days numerically instead of alphabetically 
+desired_order = c("one", "two", "three")
+dfexp2mirror$week = 
+  factor(dfexp2mirror$week, levels = desired_order, ordered = TRUE)
+
+#Behavioral Experiment 2 Data Frame Filtered Just Control treatment
+dfexp2control<-dfexp2 %>% 
+  filter(treatment == "control")
+
+#Behavioral Experiment 2 Pulling Average Total Gill Flaring
+gillflaravgexp2mirror<-dfexp2mirror%>% 
+  select(gillflaring_total_average)
+gillflaravgexp2mirror$experiment<-"behavioral_experiment_2"
+colnames(gillflaravgexp2mirror) <- c("GF","experiment")
+
+#Data Frame to check consistency across behavioral experiment 1 and 2 
+
+#Note that both sets of data are averaged across 3 days of behavior, the only difference is exp1 has the 3 days each separated by one week (Monday 1/2/3), whereas exp2 3 days in a row
+
+behav12check<-bind_rows(mondaygillflareexp1mirror,gillflaravgexp2mirror)
+
+```
+
+
+# Experiment 1 Behavior
+```{r}
+#New DataFrame with Week 1 Monday (Day 1) Gill Flaring and Treatment Group
+dfexp1mondayflare<-dfexp1day1 %>% 
+  filter(day == "monday1_startflare_prop")
+
+#Shapiro Test is not significant indicating that the data is normally distributed.Therefore, a T test is used instead of a Wilcox test
+shapiro.test(dfexp1mondayflare$startflare_prop) 
+
+#T Test is significant indicating a significant difference in Day 1 gill flaring between treatment groups (mirror vs control)
+t.test(startflare_prop ~ social_treatment, data = dfexp1mondayflare)
+cohen.d(startflare_prop ~ social_treatment, data = dfexp1mondayflare)
+
+
+#Treatment Assessment for Day 18, the final social assay of experiment 1
+
+#New DataFrame with Week 3 Thursday (Day 18) Gill Flaring and Treatment Group
+dfexp1thursdayflare<-dfexp1day18 %>% 
+  filter(day == "thursday3_startflare_prop")
+
+#Shapiro Test is significant indicating that the data is NOT normally distributed.Therefore, a Kruskal-Wallis/Wilcox is used instead of an Anova/T-test
+shapiro.test(dfexp1thursdayflare$startflare_prop)
+
+#Wilcox Test is significant indicating a significant difference in Day 18 gill flaring between treatment groups (mirror vs control)
+wilcox.test(startflare_prop ~ social_treatment, data = dfexp1thursdayflare)
+cohen.d(startflare_prop ~ social_treatment, data = dfexp1thursdayflare)
+
+
+#Treatment Day 1 vs Day 18
+
+#Shapiro Test is significant meaning the data is NOT normally distributed. A Wilcox test is used instead of T test
+shapiro.test(dffirstlast$startflare_prop)
+
+#Wilcox was not significant meaning there is no difference between gill flaring on first and last day for ALL participants
+wilcox.test(startflare_prop ~ day, data = dffirstlast)
+
+#Wilcox was significant meaning there is a difference between gill flaring on first and last day for control ONLY
+wilcox.test(startflare_prop ~ day, data = dffirstlastcontrol)
+cohen.d(startflare_prop ~ day, data = dffirstlastcontrol)
+
+#Wilcox was not significant meaning there is no difference between gill flaring on first and last day for mirror ONLY
+wilcox.test(startflare_prop ~ day, data = dffirstlastmirror)
+
+```
+
+## Figure 4a
+```{r}
+
+p <- ggplot(dffirstlast, aes(x=day, y=startflare_prop)) +
+  geom_boxplot(aes(fill = social_treatment), lwd=1, position = position_dodge(width = 0.8)) +
+  geom_dotplot(aes(type = social_treatment), binaxis = "y", stackdir = "center", position =    
+  position_dodge(width = 0.8), dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  scale_fill_manual(values= c("cadetblue", "coral3"))+
+  labs(x="Day", y="% Time Gill Flaring") +
+  scale_x_discrete(labels=c("Day 1","Day 18"))
+plot(p)
+```
+
+
+```{r}
+#Comparison of scototaxis behavior between mirror and control at the beginning and end of the expeirment (aka day 5 first scoto and day 19 last scoto)
+
+#New Data Frame With Behavior Experiment 1 Week 1, Week 2, Week 3 Friday, proportion of time spent on black side of the scototaxis assay
+dfexp1scotofriday123<-dfexp1 %>% 
+  gather(key = "day", value = "black_prop", friday1_black_prop, friday2_black_prop, friday3_black_prop)
+dfexp1scotofriday123<-dfexp1scotofriday123 %>%
+  select(day, social_treatment, black_prop)
+
+#Average across all Fridays: general proportion time spent on black side in scototaxis in experiment 1
+mean(dfexp1scotofriday123$black_prop)
+
+#New Data Frame For Just Friday Week 1, proportion of time spent on black side and treatment group
+dfexp1scotofriday1<-dfexp1scotofriday123 %>% 
+  filter(day == "friday1_black_prop") 
+
+#Shapiro Test was NOT significant meaning that the data IS normally distributed and an anova/t-test can be used
+shapiro.test(dfexp1scotofriday1$black_prop)
+
+#T-test showed no significant difference between treatment groups and proportion of time spent on black side of tank on Friday Week 1
+t.test(black_prop ~social_treatment, data = dfexp1scotofriday1)
+
+
+#New Data Frame For Just Friday Week 3 proportion of time spent on black side and treatment group
+dfexp1scotofriday3<-dfexp1scotofriday123 %>%
+  filter(day == "friday3_black_prop") 
+
+#Shapiro Test was NOT significant meaning that the data IS normally distributed and an anova/t-test can be used
+shapiro.test(dfexp1scotofriday3$black_prop)
+
+#T-test showed no significant difference between treatment groups and proportion of time spent on black side of tank on Friday Week 3
+t.test(black_prop ~social_treatment, data = dfexp1scotofriday3)
+
+
+#New Data Frame For Just Friday 1 and Friday 3, proportion of time spent on black side, and BOTH treatment groups  
+dfexp1scotofriday13<-dfexp1scotofriday123 %>% 
+  filter(day == "friday1_black_prop"|day == "friday3_black_prop")
+
+
+#Shapiro Test was NOT significant meaning there was normal distribution between all the Friday's 
+shapiro.test(dfexp1scotofriday13$black_prop)
+
+#New Data Frame For Just Friday 1 and Friday 3, proportion of time spent on black side, and mirror ONLY
+dfexp1scotofriday13m<-dfexp1scotofriday123 %>% 
+  filter(day == "friday1_black_prop"|day == "friday3_black_prop")
+dfexp1scotofriday13m<-dfexp1scotofriday13m %>% 
+  filter(social_treatment == "mirror")
+
+#T-test showed no significant difference between Friday Week 1 and Friday Week 3 mirror ONLY
+t.test(black_prop ~ day, data = dfexp1scotofriday13m)
+
+#New Data Frame For Just Friday 1 and Friday 3, proportion of time spent on black side, and control ONLY
+dfexp1scotofriday13c<-dfexp1scotofriday123 %>% 
+  filter(day == "friday1_black_prop"|day == "friday3_black_prop")
+dfexp1scotofriday13c<-dfexp1scotofriday13c %>% 
+  filter(social_treatment == "none")
+
+#T-test showed no significant difference between Friday Week 1 and Friday Week 3 control ONLY
+t.test(black_prop ~ day, data = dfexp1scotofriday13c)
+
+```
+
+## Figure 4b
+```{r}
+
+dfexp1scotofriday13<-dfexp1scotofriday123 %>%
+  filter(day == "friday1_black_prop"|day == "friday3_black_prop") 
+
+p <- ggplot(dfexp1scotofriday13, aes(x=day, y=black_prop)) +
+ geom_boxplot(aes(fill = social_treatment), lwd=1, position = position_dodge(width = 0.8)) +
+  geom_dotplot(aes(type = social_treatment), binaxis = "y", stackdir = "center", position =    
+  position_dodge(width = 0.8), dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  scale_fill_manual(values= c("cadetblue", "coral3"))+
+ labs(x="Day", y="% Time in Black", fill = "Treatment") +
+ scale_x_discrete(labels=c("Day 5","Day 19"))
+plot(p)
+```
+
+
+```{r}
+#This linear model showed no correlation between gill flaring on the day before scototaxis on an individual level in week 1
+gfscoto1<-lm(friday1_black_prop ~ thursday1_startflare_prop, data = dfexp1mirror)
+summary(gfscoto1)
+
+#This linear model showed no correlation between gill flaring on the day before scototaxis on an individual level in week 3
+gfscoto3<-lm(friday3_black_prop ~ thursday3_startflare_prop, data = dfexp1mirror)
+summary(gfscoto3)
+```
+
+## Supplemental Figure 1
+```{r}
+
+#Supplemental Figure 1a
+p <- ggplot(dfexp1mirror, aes(thursday1_startflare_prop, friday1_black_prop)) + 
+								geom_point(size = 4) + geom_smooth(method = "lm", 
+								se = FALSE, colour = "gray60") + theme(text = element_text(size = 10)) + 
+								labs(x = "%gill flaring day prior to first scoto (day 4)", y = "% black first scoto (day 5)") +
+                theme_classic(base_size = 18)
+plot(p)
+
+#Supplemental Figure 1b
+p <- ggplot(dfexp1mirror, aes(thursday3_startflare_prop, friday3_black_prop)) + 
+								geom_point(size = 4) + geom_smooth(method = "lm", 
+								se = FALSE, colour = "gray60") + theme(text = element_text(size = 10)) + 
+								labs(x = "%gill flaring day prior to last scoto (day 18)", y = "% black last scoto (day 19)") +
+                theme_classic(base_size = 18)
+plot(p)
+```
+
+
+
+```{r}
+##Comparing amount of gill flaring in experiments 1 & 2 to be able to talk about comparisons (also adding the late week 1 vs original week 1 from experiment 2)
+
+#Shapiro Test was not significant indicating a normal distribution of gill flaring in all gill flaring from behavioral experiments 1 and 2
+shapiro.test(behav12check$GF)
+
+#T test to compare whether or not gill flaring is consistent across behavioral experiments 1 and 2. Test was not significant indicating that there is consistency.
+t.test(GF ~ experiment, data = behav12check)
+
+
+#Gill Flaring Total Average of Mondays Exp 1
+mean(dfexp1mirror$monday_average_startflare_prop, na.rm = TRUE)
+sd(dfexp1mirror$monday_average_startflare_prop, na.rm = TRUE)
+
+#Gill Flaring Total Average Exp 2
+mean(dfexp2mirror$gillflaring_total_average, na.rm = TRUE)
+sd(dfexp2mirror$gillflaring_total_average, na.rm = TRUE)
+
+#did the late-added fish in week 1 differ in gill-flaring compared to the original week 1 fish? No
+t.test(gillflaring_total_average ~ week1_cohort, data = dfexp2)
+
+
+```
+
+
+# Experiment 2 Behavior
+```{r}
+#average time spent near stimulus (mirror only)
+mean(dfexp2mirror$location_total_average)
+sd(dfexp2mirror$location_total_average)
+
+#average time spent near stimulus (control only)
+mean(dfexp2control$location_total_average)
+sd(dfexp2control$location_total_average)
+
+#Shapiro test was significant indicating that the data is NOT normally distributed
+shapiro.test(dfexp2$location_total_average)
+
+#Wilcox showed a significant difference in total average location between mirror and control group 
+wilcox.test(location_total_average ~ treatment, data = dfexp2)
+cohen.d(location_total_average ~ treatment, data = dfexp2)
+
+#now running the difference between total average location between mirror and control group - WEEK 1
+dftemp<- dfexp2 %>% filter(week == "one")
+wilcox.test(location_total_average ~ treatment, data = dftemp)
+cohen.d(location_total_average ~ treatment, data = dftemp)
+
+#now running the difference between total average location between mirror and control group - WEEK 2
+dftemp<- dfexp2 %>% filter(week == "two")
+wilcox.test(location_total_average ~ treatment, data = dftemp)
+cohen.d(location_total_average ~ treatment, data = dftemp)
+
+#now running the difference between total average location between mirror and control group - WEEK 3
+dftemp<- dfexp2 %>% filter(week == "three")
+wilcox.test(location_total_average ~ treatment, data = dftemp)
+
+
+#does the control significantly differ from 50%
+shapiro.test(dfexp2control$location_total_average)
+wilcox.test(dfexp2control$location_total_average, mu = 0.5)
+cohen.d(dfexp2control$location_total_average~1, mu = 0.5)
+
+#Gill Flaring Latency Average
+mean(dfexp2mirror$gillflaring_latency_average, na.rm = TRUE)
+sd(dfexp2mirror$gillflaring_latency_average, na.rm = TRUE)
+
+#average bite latency
+mean(dfexp2mirror$bite_latency_average, na.rm = TRUE)
+sd(dfexp2mirror$bite_latency_average, na.rm = TRUE)
+
+
+bitemod <- glm(dfexp2mirror$bite_latency_average ~ dfexp2mirror$gillflaring_prior_average)
+summ(bitemod)
+
+
+```
+
+
+##Experiment 2 Consistency across days
+
+```{r}
+#Gillflaring individual consistency day 1 vs 2 and 2 vs 3
+dftemp<-dfexp2mirror %>% filter(gillflaring_total_day1 < 0.8) #note I'm removing one fish who had very high gill flaring on day 1
+
+mod <- lm(dftemp$gillflaring_total_day1 ~ dftemp$gillflaring_total_day2)
+summ(mod)
+
+
+mod <- lm(dftemp$gillflaring_total_day1 ~ dftemp$gillflaring_total_day3)
+summ(mod)
+
+```
+
+
+##Figure 5a
+```{r}
+
+dftemp1<-dfexp2mirror %>% select(fish_id, gillflaring_total_day1)
+dftemp1$day <- "1"
+colnames(dftemp1)<-c("fish_id", "gillflaring", "day")
+dftemp2<-dfexp2mirror %>% select(fish_id, gillflaring_total_day2)
+dftemp2$day <- "2"
+colnames(dftemp2)<-c("fish_id", "gillflaring", "day")
+dftemp3<-dfexp2mirror %>% select(fish_id, gillflaring_total_day3)
+dftemp3$day <- "3"
+colnames(dftemp3)<-c("fish_id", "gillflaring", "day")
+
+dftemp<-rbind(dftemp1, dftemp2)
+dftemp<-rbind(dftemp, dftemp3)
+
+
+dftemp<- dftemp %>% filter(gillflaring< 0.8) 
+
+
+ICCest(fish_id, gillflaring, data = dftemp) #0.82 ICC
+
+
+p <- ggplot(dftemp, aes(x = reorder(fish_id,gillflaring), y = gillflaring)) + 
+								geom_point(size = 4, aes(fill = day), shape = 25) + geom_smooth(method = "lm",	se = FALSE, colour = "gray60") + 
+                theme(text = element_text(size = 10)) + 
+								labs(x = "Fish", y = "gill_flaring") +
+                scale_fill_manual(values= c("cadetblue4", "cadetblue2", "azure"))+
+                theme_classic(base_size = 12)+
+                theme(axis.text.x = element_text(size = 8, angle = 45))
+plot(p)
+
+
+
+```
+
+## Figure 5b
+```{r}
+dftemp<-dfexp2 %>% select(week, location_total_average, treatment)
+desired_order = c("one", "two", "three")
+dftemp$week = factor(dftemp$week, levels = desired_order, ordered = TRUE)
+
+p<-ggplot(dftemp, aes(x = week, y = location_total_average)) +
+geom_boxplot(aes(fill = treatment), lwd=1, position = position_dodge(width = 0.75)) +
+  geom_dotplot(aes(type = treatment), binaxis = "y", stackdir = "center", position =    
+  position_dodge(width = 0.75), dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  scale_fill_manual(values= c("coral3", "cadetblue"))+
+   labs(x = "week", y = "% Time Spent Near Stimulus")
+plot(p)
+
+```
+
+
+## Figure 5c
+```{r}
+p <- ggplot(dfexp2mirror, aes(x=week, y=gillflaring_total_average)) +
+  geom_boxplot(lwd=1, fill = "cadetblue") +
+  geom_dotplot(binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  stat_n_text() +
+  theme_classic(base_size = 18) +
+  xlab("Experiment 2 Weeks") +
+  ylab("% Time Spent Gill Flaring (Mirror)")
+plot(p)
+
+```
+
+
+```{r}
+#behavior did not change over the three weeks in exp 2
+
+#Kruskal-Wallis showed no significant difference in total average location in mirror group ONLY across weeks
+shapiro.test(dfexp2mirror$location_total_average)
+kruskal.test(location_total_average ~ week, data = dfexp2mirror)
+
+#Kruskal-Wallis showed no significant difference in total average location in control group ONLY across weeks
+shapiro.test(dfexp2control$location_total_average)
+kruskal.test(location_total_average ~ week, data = dfexp2control)
+
+
+
+#Shapiro Test is NOT significant indicating that the data is normally distributed. An Anova test is used instead of a Kruskal-Wallis Test
+shapiro.test(dfexp2mirror$gillflaring_total_average)
+
+#Anova Test showed no significant difference between the average amount of time spent gill flaring each week in the mirror group ONLY
+gillflarexp2week123<-aov(gillflaring_total_average ~ week, dfexp2mirror)
+summary(gillflarexp2week123)
+p_value_aov<-summary(gillflarexp2week123)[[1]][["Pr(>F)"]][1]
+
+
+#Shapiro test was NOT significant indicating that the data IS normally distributed. An Anova test is used instead of a Kruskal-Wallis
+shapiro.test(dfexp2mirror$bite_latency_average)
+
+#Anova Test showed no significant difference between average bite latency across weeks for mirror group ONLY
+bitelatencyexp2week123<-aov(bite_latency_average ~ week, dfexp2mirror)
+summary(bitelatencyexp2week123)
+p_value_aov<-summary(bitelatencyexp2week123)[[1]][["Pr(>F)"]][1]
+
+
+#Shapiro test was significant indicating that the data is NOT normally distributed. An Kruskal-Wallis test is used instead of an Anova
+shapiro.test(dfexp2mirror$gillflaring_latency_average)
+
+#Kruskal-Wallis showed no significant difference between average gill flaring latency across weeks for mirror group ONLY
+kruskal.test(gillflaring_latency_average ~ week, data = dfexp2mirror)
+
+#Shapiro test was NOT significant indicating that the data IS normally distributed. An Anova test is used instead of a Kruskal-Wallis
+shapiro.test(dfexp2mirror$gillflaring_prior_average)
+
+#Anova Test showed no significant difference in gill flaring prior to first bite across weeks for mirror ONLY
+gillflarpriorexp2week123<-aov(gillflaring_prior_average ~ week, dfexp2mirror)
+summary(gillflarpriorexp2week123)
+p_value_aov<-summary(gillflarpriorexp2week123)[[1]][["Pr(>F)"]][1]
+
+
+```
+
+## Supplmental Figure 2 
+```{r}
+p <- ggplot(dfexp2mirror, aes(x=week, y=bite_latency_average)) +
+geom_boxplot(fill = "cadetblue", lwd=1) +
+  geom_dotplot(aes(type = week), binaxis = "y", stackdir = "center", dotsize = 1.15) +
+  theme_classic(base_size = 18) +
+  stat_n_text() +
+  xlab ("Weeks") +
+  ylab ("Bite Latency")
+plot(p)
+
+
+p <- ggplot(dfexp2mirror, aes(x=week, y=gillflaring_latency_average)) +
+  geom_boxplot(fill = "cadetblue", lwd=1) +
+  geom_dotplot(aes(type = week), binaxis = "y", stackdir = "center", dotsize = 1.15) +
+  theme_classic(base_size = 18) +
+  stat_n_text() +
+  xlab ("Weeks") +
+  ylab ("Gill Flaring Latency")
+plot(p)
+
+
+
+
+p <- ggplot(dfexp2mirror, aes(x=week, y=gillflaring_prior_average)) +
+ geom_boxplot(fill = "cadetblue", lwd=1) +
+  geom_dotplot(aes(type = week), binaxis = "y", stackdir = "center", dotsize = 1.15) +
+  theme_classic(base_size = 18) +
+  stat_n_text() +
+  xlab ("Weeks") +
+  ylab ("Gillflaring Prior to First Bite")
+plot(p)
+
+```
+
+
+```{r}
+
+
+#GSI
+temp<-dfexp2mirror
+temp$gsi<-as.numeric(temp$gsi)
+mean(temp$gsi, na.rm = TRUE)
+sd(temp$gsi, na.rm = TRUE)
+
+#GSI showed no difference between weeks or between mirror/control
+mod<-aov(gsi ~ week, temp)
+summary(mod)
+
+
+temp2<-dfexp2
+temp2$gsi<-as.numeric(temp2$gsi)
+mod<-aov(gsi ~ treatment, temp2)
+summary(mod)
+p_value_aov<-summary(mod)[[1]][["Pr(>F)"]][1]
+p_value_aov
+
+
+#GSI by gill flaring average across 3 days is not significant
+gsimod <- glm(temp$gillflaring_total_average ~ temp$gsi)
+summ(gsimod)
+
+#GSI by gill flaring latency across 3 days is not significant
+gsimod <- glm(temp$gillflaring_latency_average ~ temp$gsi)
+summ(gsimod)
+
+
+#GSI by bite latency across 3 days is not significant
+gsimod <- glm(temp$bite_latency_average ~ temp$gsi)
+summ(gsimod)
+
+#GSI linear model trend correlation with cortisol, posthoc with a gamma family is significant
+gsimod <- lm(temp$cort_level ~ temp$gsi)
+summ(gsimod)
+
+gsimod <- glm(temp$cort_level ~ temp$gsi, family = Gamma)
+summary(gsimod)
+summ(gsimod)
+
+
+```
+
+## Supplemental Figure 3
+```{r}
+p <- ggplot(temp, aes(gsi, cort_level)) + 
+								geom_point(size = 4) + geom_smooth(method = "glm", method.args = list(family = "Gamma"),
+								se = FALSE, colour = "gray60") + theme(text = element_text(size = 10)) + 
+								labs(x = "GSI", y = "cortisol") +
+                theme_classic(base_size = 18)
+plot(p)
+```
+
+
+# Experiment 2 Immunohistochemistry
+
+```{r}
+
+#All p value statistical tests for PS6 expression (VS DCX tests are separate)
+
+
+#Mirror vs Control (ALL REGIONS)
+
+#Rostral Vs
+shapiro.test(dfexp2$vs_rostral)
+
+t_test<-t.test(vs_rostral ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+cohen.d(vs_rostral ~ treatment, data = dfexp2)
+
+#Caudal Vs
+shapiro.test(dfexp2$vs_caudal)
+
+t_test<-t.test(vs_caudal ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+
+################################
+#Posthoc correlating behavior in just the Vs (mirror group only, all weeks combined)
+
+#total average amount of gill flaring on the final day (DAY 3) does not significantly correlate to Vs expression
+gfmodel <- lm(dfexp2mirror$vs_caudal ~ dfexp2mirror$gillflaring_total_day3)
+ p_value <- summary(gfmodel)$coefficients[8]
+ p_value 
+
+#total average amount of gill flaring significantly correlates to Vs caudal expression
+gfmodel <- lm(dfexp2mirror$vs_caudal ~ dfexp2mirror$gillflaring_total_average)
+p_value <- summary(gfmodel)$coefficients[8]
+p_value
+summ(gfmodel)
+
+#DAPI posthoc test
+#Shapiro test showed NO significant difference indicating that the data IS normally distributed. A t test was used instead of a Wilcox
+shapiro.test(dfexp2$vs_DAPI_caudal)
+
+#T test showed no significant difference between Vs DAPI caudal between mirror and control groups
+t.test(vs_DAPI_caudal ~ treatment, data = dfexp2)
+
+
+#Shapiro test showed NO significant difference indicating that the data IS normally distributed. A t test was used instead of a Wilcox
+shapiro.test(dfexp2$vs_DAPI_total)
+##################################
+
+ 
+#Total Vs
+shapiro.test(dfexp2$vs_total)
+
+t_test<-t.test(vs_rostral ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+
+#Rostral Vd
+shapiro.test(dfexp2$vd_rostral)
+
+t_test<-t.test(vd_rostral ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+#Caudal Vd
+t_test<-t.test(vd_caudal ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+
+#Total Vd
+t_test<-t.test(vd_total ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+
+#Rostral VvM
+t_test<-t.test(vvm_rostral ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+#Caudal VvM
+t_test<-t.test(vvm_caudal ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+#Total VvM
+t_test<-t.test(vvm_total ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+
+#Rostral VvL
+t_test<-t.test(vvl_rostral ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+#Caudal VvL
+t_test<-t.test(vvl_caudal ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+#Total VvL
+t_test<-t.test(vvl_total ~ treatment, data = dfexp2)
+p_value_t<-t_test$p.value
+p.adjust(p_value_t, method = "fdr", n = 7)
+
+
+#Mirror only, difference per week in each region
+
+#Rostral Vs
+test<-aov(vs_rostral ~ week, dfexp2mirror)
+summary(test)
+
+#Caudal Vs
+test<-aov(vs_caudal ~ week, dfexp2mirror)
+summary(test)
+
+#Total Vs
+test<-aov(vs_total ~ week, dfexp2mirror)
+summary(test)
+
+
+#Rostral Vd
+test<-aov(vd_rostral ~ week, dfexp2mirror)
+summary(test)
+
+#Caudal Vd
+test<-aov(vd_caudal ~ week, dfexp2mirror)
+summary(test)
+
+#Total Vd
+test<-aov(vd_total ~ week, dfexp2mirror)
+summary(test)
+
+
+#Rostral VvM
+test<-aov(vvm_rostral ~ week, dfexp2mirror)
+summary(test)
+
+#Caudal VvM
+test<-aov(vvm_caudal ~ week, dfexp2mirror)
+summary(test)
+
+#Total VvM
+test<-aov(vvm_total ~ week, dfexp2mirror)
+summary(test)
+
+
+#Rostral VvL
+test<-aov(vvl_rostral ~ week, dfexp2mirror)
+summary(test)
+
+#Caudal VvL
+test<-aov(vvl_caudal ~ week, dfexp2mirror)
+summary(test)
+
+#Total VvL
+test<-aov(vvl_total ~ week, dfexp2mirror)
+summary(test)
+
+
+#Mirror only gillflaring in each region
+
+#Rostral Vs
+mod <- lm(dfexp2mirror$vs_rostral ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Caudal Vs
+mod <- lm(dfexp2mirror$vs_caudal ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Total Vs
+mod <- lm(dfexp2mirror$vs_total ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+
+#Rostral Vd
+mod <- lm(dfexp2mirror$vd_rostral ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Caudal Vd
+mod <- lm(dfexp2mirror$vd_caudal ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Total Vd
+mod <- lm(dfexp2mirror$vd_total ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+
+#Rostral VvM
+mod <- lm(dfexp2mirror$vvm_rostral ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Caudal VvM
+mod <- lm(dfexp2mirror$vvm_caudal ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Total VvM
+mod <- lm(dfexp2mirror$vvm_total ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+
+#Rostral VvL
+mod <- lm(dfexp2mirror$vvl_rostral ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#caudal VL
+mod <- lm(dfexp2mirror$vvl_caudal ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+#Total VvL
+mod <- lm(dfexp2mirror$vvl_total ~ dfexp2mirror$gillflaring_total_day3)
+p_value <- summary(mod)$coefficients[8]
+p_value
+
+
+#All individuals gonadosomatic index in all regions 
+
+dfexp2$gsi<-as.numeric(dfexp2$gsi)
+
+#Rostral Vs
+ mod <- lm(dfexp2$vs_rostral ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal Vs
+ mod <- lm(dfexp2$vs_caudal ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total Vs
+ mod <- lm(dfexp2$vs_total ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+
+ 
+#Rostral Vd
+ mod <- lm(dfexp2$vd_rostral ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal Vd
+ mod <- lm(dfexp2$vd_caudal ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total Vd
+ mod <- lm(dfexp2$vd_total ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+
+
+#Rostral VvM
+ mod <- lm(dfexp2$vvm_rostral ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal VvM
+ mod <- lm(dfexp2$vvm_caudal ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total VvM
+ mod <- lm(dfexp2$vvm_total ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+
+
+#Rostral VvL
+ mod <- lm(dfexp2$vvl_rostral ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#caudal VvL
+ mod <- lm(dfexp2$vvl_caudal ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total VvL
+ mod <- lm(dfexp2$vvl_total ~ dfexp2$gsi)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+
+
+#Mirror-exposed individuals standard length in each region 
+
+#Rostral Vs
+ mod <- lm(dfexp2$vs_rostral ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal Vs
+ mod <- lm(dfexp2$vs_caudal ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total Vs
+ mod <- lm(dfexp2$vs_total ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+
+ 
+#Rostral Vd
+ mod <- lm(dfexp2$vd_rostral ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal Vd
+ mod <- lm(dfexp2$vd_caudal ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total Vd
+ mod <- lm(dfexp2$vd_total ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+
+ 
+#Rostral VvM
+ mod <- lm(dfexp2$vvm_rostral ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal VvM
+ mod <- lm(dfexp2$vvm_caudal ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total VvM
+ mod <- lm(dfexp2$vvm_total ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+
+#Rostral VvL
+ mod <- lm(dfexp2$vvl_rostral ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Caudal VvL
+ mod <- lm(dfexp2$vvl_caudal ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+#Total VvL
+ mod <- lm(dfexp2$vvl_total ~ dfexp2$standard_length)
+ p_value <- summary(mod)$coefficients[8]
+ p_value
+ 
+ 
+ #Note that DCX mirror vs control in Vs ONLY in supp dapi posthoc comparison to vs below
+ 
+
+```
+
+## Figure 6
+```{r}
+#Figure 6
+
+p <- ggplot(dfexp2mirror, aes(x=week, y=vs_caudal)) +
+geom_boxplot(fill = "cadetblue3", lwd=1) +
+  geom_dotplot(aes(type = treatment), binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  xlab ("Week") +
+  ylab ("Vs Caudal")
+plot(p)
+
+
+
+
+p <- ggplot(dfexp2, aes(x=treatment, y=vs_caudal)) +
+geom_boxplot(aes(fill = treatment), lwd=1) +
+  geom_dotplot(aes(type = treatment), binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  scale_fill_manual(values= c("salmon1", "cadetblue3"))+
+  #stat_n_text() +
+  xlab ("Treatment") +
+  ylab ("Vs Caudal")
+plot(p)
+
+
+p <- ggplot(dfexp2mirror, aes(gillflaring_total_average, vs_caudal)) + 
+								geom_point(size = 4) + geom_smooth(method = "lm", 
+								se = FALSE, colour = "gray60") + theme(text = element_text(size = 10)) + 
+								labs(x = "%gill flaring", y = "vs_caudal") +
+                theme_classic(base_size = 18)
+plot(p)
+
+
+
+
+```
+
+
+```{r}
+#DCX
+
+#T test showed no significant results of DCX activation in vs rostral between treatment groups
+dcxmod<-aov(vs_DCX_rostral ~ week, data = dfexp2mirror)
+summary(dcxmod)
+
+#T test showed no significant results of DCX activation in vs caudal between treatment groups
+dcxmod<-aov(vs_DCX_caudal ~ week, data = dfexp2mirror)
+summary(dcxmod)
+
+#T test showed no significant results of DCX activation in vs overall between treatment groups
+dcxmod<-aov(vs_DCX_total ~ week, data = dfexp2mirror)
+summary(dcxmod)
+
+
+
+#Shapiro test showed NO significant difference indicating that the data IS normally distributed. A t test was used instead of a Wilcox
+shapiro.test(dfexp2$vs_DCX_rostral)
+
+#T test showed no significant difference between Vs DCX rostral between mirror and control groups
+t_test<-t.test(vs_DCX_rostral ~ treatment, data = dfexp2)
+p_value<-t_test$p.value
+p.adjust(p_value, method = "fdr", n = 7)
+
+
+
+#Shapiro test showed NO significant difference indicating that the data IS normally distributed. A t test was used instead of a Wilcox
+shapiro.test(dfexp2$vs_DCX_caudal)
+
+#T test showed no significant difference between Vs DCX caudal between mirror and control groups
+t_test<-t.test(vs_DCX_caudal ~ treatment, data = dfexp2)
+p_value<-t_test$p.value
+p.adjust(p_value, method = "fdr", n = 7)
+
+
+
+
+```
+
+
+# Experiment 2 Cortisol
+```{r}
+#Shapiro test IS significant indicating that the data is NOT normally distributed. A Kruskal-Wallis test is used instead of an Anova. 
+shapiro.test(dfexp2mirror$cort_level)
+
+#Kruskal-Wallis showed no significant difference in cortisol levels in mirror ONLY between weeks
+kruskal.test(cort_level ~ week, data = dfexp2mirror)
+
+#Wilcox test showed no significant difference between cortisol level and treatment group 
+wilcox.test(cort_level ~ treatment, data = dfexp2)
+
+#Linear model showed no significant correlation between cortisol level and gill flaring on the day cortisol levels were taken in mirror group ONLY
+cortgill <- lm(dfexp2mirror$cort_level ~ dfexp2mirror$gillflaring_total_day1)
+ p_value <- summary(cortgill)$coefficients[8]
+ p_value
+ 
+ 
+```
+
+## Figure 7a and 7b
+```{r}
+
+#Figure 7a
+p <- ggplot(dfexp2, aes(x=week, y=cort_level)) +
+geom_boxplot(fill = "goldenrod", lwd=1) +
+  geom_dotplot(aes(type = week), binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  stat_n_text() +
+  xlab ("Weeks") +
+  ylab ("Cortisol Level")
+plot(p)
+
+
+#Figure 7b
+p <- ggplot(dfexp2, aes(x=treatment, y=cort_level)) +
+geom_boxplot(fill = "goldenrod", lwd=1) +
+  geom_dotplot(aes(type = treatment), binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  stat_n_text() +
+  xlab ("Treatment Groups") +
+  ylab ("Cortisol Level")
+plot(p)
+
+```
+
+
+
+## Supplemental Figure 4
+```{r}
+
+ p <- ggplot(dfexp2, aes(x=treatment, y=vs_DCX_rostral)) +
+geom_boxplot(aes(fill = treatment), lwd=1) +
+  geom_dotplot(aes(type = treatment), binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  scale_fill_manual(values= c("salmon1", "cadetblue3"))+
+  #stat_n_text() +
+  xlab ("Treatment") +
+  ylab ("Vs DCX Rostral")
+plot(p)
+
+
+ p <- ggplot(dfexp2, aes(x=treatment, y=vs_DCX_caudal)) +
+  geom_boxplot(aes(fill = treatment), lwd=1) +
+  geom_dotplot(aes(type = treatment), binaxis = "y", stackdir = "center", dotsize = 0.7) +
+  theme_classic(base_size = 18) +
+  scale_fill_manual(values= c("salmon1", "cadetblue3"))+
+  #stat_n_text() +
+  xlab ("Treatment") +
+  ylab ("Vs DCX Caudal")
+plot(p)
+
+```
+
+
+
+
